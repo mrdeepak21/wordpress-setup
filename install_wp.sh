@@ -23,7 +23,16 @@ fi
 sudo apt update && sudo apt upgrade -y
 
 # Install necessary packages
-sudo apt install -y nginx mariadb-server php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-xmlrpc php-soap php-intl php-zip curl redis-server php-redis
+sudo apt install -y nginx mariadb-server php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-xmlrpc php-soap php-intl php-zip curl redis-server php-redis php-imagick unzip php-common php-cli
+
+
+
+
+# Detect the installed PHP version
+PHP_VERSION=$(php -v | grep -oP 'PHP \K[0-9]+\.[0-9]+')
+PHP_FPM_SOCKET="/var/run/php/php${PHP_VERSION}-fpm.sock"
+echo "Detected PHP version: $PHP_VERSION"
+echo "PHP-FPM socket: $PHP_FPM_SOCKET"
 
 # Secure MariaDB installation
 sudo mysql_secure_installation <<EOF
@@ -90,7 +99,7 @@ server {
 
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+        fastcgi_pass unix:$PHP_FPM_SOCKET;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
@@ -158,7 +167,7 @@ server {
 
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+        fastcgi_pass unix:$PHP_FPM_SOCKET;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
@@ -216,21 +225,21 @@ fi
 sudo unlink /etc/nginx/sites-enabled/default
 
 # Modify PHP configuration
-sudo sed -i 's/^;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 32M/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^post_max_size = .*/post_max_size = 512M/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^memory_limit = .*/memory_limit = 512M/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^max_input_time = .*/max_input_time = 300/' /etc/php/*/fpm/php.ini
-sudo sed -i 's/^max_input_vars = .*/max_input_vars = 10000/' /etc/php/*/fpm/php.ini
+sudo sed -i 's/^;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 32M/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^post_max_size = .*/post_max_size = 512M/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^memory_limit = .*/memory_limit = 512M/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^max_input_time = .*/max_input_time = 300/' /etc/php/$PHP_VERSION/fpm/php.ini
+sudo sed -i 's/^max_input_vars = .*/max_input_vars = 10000/' /etc/php/$PHP_VERSION/fpm/php.ini
 
 # Configure Redis
 sudo sed -i 's/^# maxmemory .*/maxmemory 256mb/' /etc/redis/redis.conf
 sudo sed -i 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/' /etc/redis/redis.conf
 
 # Enable auto-restart for services
-sudo systemctl enable nginx php*-fpm mysql redis-server
-sudo systemctl restart nginx php*-fpm mysql redis-server
+sudo systemctl enable nginx php$PHP_VERSION-fpm mysql redis-server
+sudo systemctl restart nginx php$PHP_VERSION-fpm mysql redis-server
 
 # Install Let's Encrypt SSL if enabled
 if [[ "$INSTALL_SSL" == "yes" ]]; then
